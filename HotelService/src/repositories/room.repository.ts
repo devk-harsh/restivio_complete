@@ -1,6 +1,6 @@
 import Room from "../db/models/room";
 import BaseRepository from "./base.repository";
-import {CreationAttributes, Op,} from "sequelize";
+import {CreationAttributes, Op, Transaction,} from "sequelize";
 
 export class RoomRepository extends BaseRepository<Room> {
   constructor() {
@@ -100,5 +100,117 @@ export class RoomRepository extends BaseRepository<Room> {
       });
     return rooms;
   }
+  async findByBookingIdForUpdate(
+    bookingId: number,
+    transaction: Transaction
+  ): Promise<Room[]> {
+    return this.model.findAll({
+      where: {
+        bookingId,
+      },
 
+      transaction,
+
+      lock: transaction.LOCK.UPDATE,
+
+      order: [
+        ["roomNo", "ASC"],
+        ["dateOfAvailability", "ASC"],
+      ],
+    });
+  }
+
+  async findUnbookedInventoryForStayForUpdate(
+    hotelId: number,
+    roomCategoryId: number,
+    stayDates: string[],
+    transaction: Transaction
+  ): Promise<Room[]> {
+    if (stayDates.length === 0) {
+      return [];
+    }
+
+    return this.model.findAll({
+      where: {
+        hotelId,
+        roomCategoryId,
+
+        dateOfAvailability: {
+          [Op.in]: stayDates,
+        },
+
+        bookingId: null,
+        deletedAt: null,
+      },
+
+      transaction,
+
+      lock: transaction.LOCK.UPDATE,
+
+      order: [
+        ["roomNo", "ASC"],
+        ["dateOfAvailability", "ASC"],
+      ],
+    });
+  }
+
+  async reserveInventoryRows(
+    bookingId: number,
+    hotelId: number,
+    roomCategoryId: number,
+    roomNos: number[],
+    stayDates: string[],
+    transaction: Transaction
+  ): Promise<number> {
+    const [affectedRows] =
+      await this.model.update(
+        {
+          bookingId,
+        },
+        {
+          where: {
+            hotelId,
+            roomCategoryId,
+
+            roomNo: {
+              [Op.in]: roomNos,
+            },
+
+            dateOfAvailability: {
+              [Op.in]: stayDates,
+            },
+
+            bookingId: null,
+            deletedAt: null,
+          },
+
+          transaction,
+        }
+      );
+
+    return affectedRows;
+  }
+
+  async releaseInventoryByBookingId(
+    bookingId: number,
+    hotelId: number,
+    transaction: Transaction
+  ): Promise<number> {
+    const [affectedRows] =
+      await this.model.update(
+        {
+          bookingId: null,
+        },
+        {
+          where: {
+            bookingId,
+            hotelId,
+          },
+
+          transaction,
+        }
+      );
+
+    return affectedRows;
+  }
 }
