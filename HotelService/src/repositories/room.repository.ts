@@ -55,4 +55,50 @@ export class RoomRepository extends BaseRepository<Room> {
       }
     );
   }
+
+  async findUnbookedInventoryForStay(
+    hotelId: number,
+    roomCategoryIds: number[],
+    stayDates: string[]
+  ): Promise<Room[]> {
+    if (
+      roomCategoryIds.length === 0 ||
+      stayDates.length === 0
+    ) {
+      return [];
+    }
+
+    const rooms =
+      await this.model.findAll({
+        where: {
+          hotelId,
+
+          roomCategoryId: {
+            [Op.in]: roomCategoryIds,
+          },
+
+          dateOfAvailability: {
+            [Op.in]: stayDates,
+          },
+
+          bookingId: null,
+
+          deletedAt: null,
+        },
+
+        attributes: [
+          "roomCategoryId",
+          "roomNo",
+          "dateOfAvailability",
+        ],
+
+        order: [
+          ["roomCategoryId", "ASC"],
+          ["roomNo", "ASC"],
+          ["dateOfAvailability", "ASC"],
+        ],
+      });
+    return rooms;
+  }
+
 }

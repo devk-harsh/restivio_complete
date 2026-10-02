@@ -37,20 +37,27 @@ export const validateRequestBody = (schema: ZodTypeAny) => {
 export const validateQueryParams = (schema: ZodTypeAny) => {
     return async (req: Request, res: Response, next: NextFunction) => {
         try {
+            logger.info("Validating query params");
+        res.locals.validatedQuery =
+            await schema.parseAsync(
+            req.query
+            );
+        logger.info(
+            "Query params are valid"
+        );
 
-            req.query = await schema.parseAsync(req.query);
-            console.log("Query params are valid");
-            next();
-
+        next();
         } catch (error) {
-            // If the validation fails, 
+        logger.error(
+            "Query params are invalid"
+        );
 
-            res.status(400).json({
-                message: "Invalid query params",
-                success: false,
-                error: error
-            });
-            
+        res.status(400).json({
+            message:
+            "Invalid query params",
+            success: false,
+            error,
+        });
         }
     }
 }
