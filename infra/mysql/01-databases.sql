@@ -1,0 +1,3 @@
+CREATE DATABASE IF NOT EXISTS restivio_auth;
+CREATE DATABASE IF NOT EXISTS restivio_hotel;
+CREATE DATABASE IF NOT EXISTS restivio_booking;

@@ -1,0 +1,6 @@
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: restivio
+    static_configs:
+      - targets: ["auth:3000", "hotel:3001", "booking:3002", "notification:3003"]

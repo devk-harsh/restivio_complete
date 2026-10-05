@@ -1,0 +1,130 @@
+name: restivio-local
+x-common: &common
+  JWT_SECRET: ${JWT_SECRET:?Copy .env.example to .env}
+  INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Copy .env.example to .env}
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_PASSWORD: ${DB_PASSWORD:?Copy .env.example to .env}
+  NODE_ENV: development
+x-app: &app
+  restart: unless-stopped
+  init: true
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://localhost:'+process.env.PORT+'/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    interval: 10s
+    timeout: 4s
+    retries: 12
+    start_period: 30s
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      RESTIVIO_DB_PASSWORD: ${DB_PASSWORD}
+    ports: ["127.0.0.1:3307:3306"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./infra/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysql -h127.0.0.1 -uroot -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:6380:6379"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
+    restart: unless-stopped
+  auth:
+    <<: *app
+    build: { context: ., args: { SERVICE: AuthService } }
+    environment:
+      <<: *common
+      SERVICE_NAME: AuthService
+      PORT: 3000
+      DB_NAME: restivio_auth
+      DB_USER: restivio_auth
+      SEED_DEMO: ${SEED_DEMO:-true}
+      AUTH_ORIGIN: http://localhost:3000
+      COOKIE_SECURE: "false"
+    command: ["sh", "-c", "npm run migrate && if [ \"$$SEED_DEMO\" = true ]; then npm run seed; fi && npm start"]
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: { mysql: { condition: service_healthy } }
+  hotel:
+    <<: *app
+    build: { context: ., args: { SERVICE: HotelService } }
+    environment:
+      <<: *common
+      SERVICE_NAME: HotelService
+      PORT: 3001
+      DB_NAME: restivio_hotel
+      DB_USER: restivio_hotel
+      SEED_DEMO: ${SEED_DEMO:-true}
+    command: ["sh", "-c", "npm run migrate && if [ \"$$SEED_DEMO\" = true ]; then node dist/db/seed.js; fi && npm start"]
+    ports: ["127.0.0.1:3001:3001"]
+    depends_on: { mysql: { condition: service_healthy }, auth: { condition: service_healthy } }
+  booking:
+    <<: *app
+    build: { context: ., args: { SERVICE: BookingService } }
+    environment:
+      <<: *common
+      SERVICE_NAME: BookingService
+      PORT: 3002
+      DB_NAME: restivio_booking
+      DB_USER: restivio_booking
+      REDIS_SERVER_URL: redis://redis:6379
+      HOTEL_SERVICE_URL: http://hotel:3001
+      NOTIFICATION_SERVICE_URL: http://notification:3003
+    command: ["sh", "-c", "npm run migrate && npm start"]
+    ports: ["127.0.0.1:3002:3002"]
+    depends_on: { mysql: { condition: service_healthy }, redis: { condition: service_healthy }, hotel: { condition: service_healthy } }
+  notification:
+    <<: *app
+    build: { context: ., args: { SERVICE: NotificationService } }
+    environment:
+      <<: *common
+      SERVICE_NAME: NotificationService
+      PORT: 3003
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      MAIL_FROM: Restivio <no-reply@restivio.local>
+    ports: ["127.0.0.1:3003:3003"]
+    depends_on: { redis: { condition: service_healthy }, mailhog: { condition: service_started } }
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports: ["127.0.0.1:3004:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on: [prometheus]
+    restart: unless-stopped
+volumes:
+  mysql-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
