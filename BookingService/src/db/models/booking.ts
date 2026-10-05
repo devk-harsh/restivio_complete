@@ -6,7 +6,6 @@ import {
   CreationOptional
 } from "sequelize";
 import sequelize from "./sequelize";
-import IdempotencyKey from "./idempotencyKey";
 
 class Booking extends Model<
     InferAttributes<Booking>, //Look at the Booking class and automatically figure out all its attributes.
@@ -16,6 +15,11 @@ class Booking extends Model<
     declare userId: number;
     declare userEmail: string;
     declare hotelId: number;
+    declare roomCategoryId: CreationOptional<number | null>;
+    declare checkIn: CreationOptional<string | null>;
+    declare checkOut: CreationOptional<string | null>;
+    declare numberOfRooms: CreationOptional<number | null>;
+    declare allocatedRoomNos: CreationOptional<number[] | null>;
     declare bookingAmount: number;
     declare status: "PENDING" | "CONFIRMED" | "CANCELLED";
     declare totalGuests: number;
@@ -44,13 +48,18 @@ Booking.init( //actual mapping
             allowNull: false,
         },
         bookingAmount: {
-            type: DataTypes.DECIMAL(10, 2),
+            type: DataTypes.DECIMAL(12, 2),
             allowNull: false,
         },
         status: {
             type: DataTypes.ENUM("PENDING", "CONFIRMED", "CANCELLED"),
             allowNull: false,
         },
+        roomCategoryId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+        checkIn: { type: DataTypes.DATEONLY, allowNull: true },
+        checkOut: { type: DataTypes.DATEONLY, allowNull: true },
+        numberOfRooms: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+        allocatedRoomNos: { type: DataTypes.JSON, allowNull: true },
         totalGuests: {
             type: DataTypes.INTEGER,
             allowNull: false,

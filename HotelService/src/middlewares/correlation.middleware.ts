@@ -4,9 +4,10 @@ import { asyncLocalStorage } from '../utils/helpers/request.helpers';
 
 export const attachCorrelationIdMiddleware = (req: Request, res: Response, next: NextFunction) => {
     // Generate a unique correlation ID
-    const correlationId = uuidV4();
+    const correlationId = req.get('X-Correlation-ID') || uuidV4();
     
     req.headers['x-correlation-id'] = correlationId;
+    res.setHeader('X-Correlation-ID', correlationId);
 
     // Call the next middleware or route handler
 

@@ -2,6 +2,7 @@ import winston from "winston"
 import { getCorrelationId } from "../utils/context/request.context";
 import DailyRotateFile from "winston-daily-rotate-file";
 const logger = winston.createLogger({
+    defaultMeta: { service: 'NotificationService' },
     format : winston.format.combine(
         winston.format.timestamp({
             format: "YYYY-MM-DD HH:mm:ss",
@@ -9,7 +10,7 @@ const logger = winston.createLogger({
         //winston.format.json(),//Format the log in JSON or can use printf like this below :
         winston.format.printf(({timestamp, level, message, ...data})=>{
             const cid = getCorrelationId();
-            const output = {level,correlationId: cid ?? "no-cid", message, timestamp, data};
+            const output = {level,correlationId: data.correlationId || cid || "background", message, timestamp, data};
             return JSON.stringify(output);
         })
     ),

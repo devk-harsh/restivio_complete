@@ -1,4 +1,5 @@
 import express from "express";
+import { requireInternalKey } from '../../middlewares/auth.middleware';
 
 import {
   reserveRoomsHandler,
@@ -16,6 +17,8 @@ import {
 
 const internalRoomRouter =
   express.Router();
+
+internalRoomRouter.use(requireInternalKey);
 
 internalRoomRouter.post(
   "/reserve",

@@ -6,6 +6,7 @@ import {
 import {
   StatusCodes,
 } from "http-status-codes";
+import { reservations, releases } from '../config/metrics';
 
 import {
   reserveRoomsService,
@@ -16,10 +17,15 @@ export async function reserveRoomsHandler(
   req: Request,
   res: Response
 ) {
+  reservations.inc({ outcome: 'attempt' });
   const reservation =
     await reserveRoomsService(
       req.body
-    );
+    ).catch(error => {
+      reservations.inc({ outcome: error.statusCode === 409 ? 'conflict' : 'failed' });
+      throw error;
+    });
+  reservations.inc({ outcome: 'success' });
 
   res
     .status(StatusCodes.OK)
@@ -43,6 +49,7 @@ export async function releaseRoomsHandler(
     await releaseRoomsService(
       req.body
     );
+  releases.inc();
 
   res
     .status(StatusCodes.OK)

@@ -1,78 +1,23 @@
-import { Request, Response } from "express";
-import { StatusCodes } from "http-status-codes";
-import logger from "../config/logger.config";
-import { CreateBookingDTO } from "../dtos/booking.dto";
-import { 
-  createBookingService,
-  confirmBookingService,
-  getBookingByIdService,
-  cancelBookingService
- } from "../services/booking.service";
-import { BadRequestError } from "../utils/errors/app.error";
-
+import { Request, Response } from 'express';
+import { createBookingService, getBookingByIdService, listBookingsService, cancelBookingService } from '../services/booking.service';
+import { createBookingSchema, idempotencyKeySchema } from '../validators/booking.validator';
+import { BadRequestError } from '../utils/errors/app.error';
 export async function createBookingHandler(req: Request, res: Response) {
-  const bookingData: CreateBookingDTO = {
-    userId: req.body.userId,
-    userEmail: req.body.userEmail,
-    hotelId: req.body.hotelId,
-    bookingAmount: req.body.bookingAmount,
-    totalGuests: req.body.totalGuests
-  };
-
-  const result = await createBookingService(bookingData);
-
-  logger.info(`Booking controller returned booking with ID: ${result.booking.id}`);
-
-  return res.status(StatusCodes.CREATED).json({
-    success: true,
-    message: "Booking created successfully",
-    data: result
-  });
+  const key = idempotencyKeySchema.safeParse(req.get('Idempotency-Key'));
+  const body = createBookingSchema.safeParse(req.body);
+  if (!key.success || !body.success) throw new BadRequestError('Valid booking intent and Idempotency-Key header required');
+  const result = await createBookingService(body.data, res.locals.user, key.data);
+  if (result.replayed) res.set('Idempotency-Replayed', 'true');
+  res.status(result.status).json(result.body);
 }
-
-
-export async function confirmBookingHandler(req: Request, res: Response) {
-  const { idempotencyKey } = req.params;
-  
-  if (!idempotencyKey) {
-  throw new BadRequestError("Idempotency key is required");
-}
-
-  const booking = await confirmBookingService(idempotencyKey);
-
-  logger.info(`Booking controller confirmed booking with ID: ${booking.id}`);
-
-  return res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Booking confirmed successfully",
-    data: booking
-  });
-}
-
 export async function getBookingByIdHandler(req: Request, res: Response) {
-  const bookingId = Number(req.params.id);
-
-  const booking = await getBookingByIdService(bookingId);
-
-  logger.info(`Booking controller fetched booking with ID: ${booking.id}`);
-
-  return res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Booking fetched successfully",
-    data: booking
-  });
+  res.json({ success: true, data: await getBookingByIdService(Number(req.params.id), res.locals.user) });
 }
-
+export async function listBookingsHandler(req: Request, res: Response) {
+  const offset = Number(req.query.offset || 0);
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new BadRequestError('Invalid offset');
+  res.json({ success: true, data: await listBookingsService(res.locals.user, offset) });
+}
 export async function cancelBookingHandler(req: Request, res: Response) {
-  const bookingId = Number(req.params.id);
-
-  const booking = await cancelBookingService(bookingId);
-
-  logger.info(`Booking controller cancelled booking with ID: ${booking.id}`);
-
-  return res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Booking cancelled successfully",
-    data: booking
-  });
+  res.json({ success: true, data: await cancelBookingService(Number(req.params.id), res.locals.user) });
 }

@@ -3,6 +3,7 @@ import { getCorrelationId } from "../utils/helpers/request.helpers";
 import DailyRotateFile from "winston-daily-rotate-file";
 
 const logger = winston.createLogger({
+    defaultMeta: { service: 'HotelService' },
     format: winston.format.combine(
         winston.format.timestamp({ format: "MM-DD-YYYY HH:mm:ss"  }), // how the timestamp should be formatted
         winston.format.json(), // Format the log message as JSON
@@ -12,7 +13,7 @@ const logger = winston.createLogger({
                 level,
                 message, 
                 timestamp, 
-                correlationId: getCorrelationId(), 
+                correlationId: data.correlationId || getCorrelationId(),
                 data 
             };
             return JSON.stringify(output);

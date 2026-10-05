@@ -1,4 +1,6 @@
 import express from "express";
+import { authenticate, requireRole } from '../../middlewares/auth.middleware';
+import { requireHotelOwner } from '../../middlewares/ownership.middleware';
 import {
   createRoomCategoryHandler,
   getRoomCategoriesByHotelHandler,
@@ -21,6 +23,13 @@ import {generateRoomInventorySchema,} from "../../validators/roomGeneration.vali
 
 const roomCategoryRouter = express.Router({
   mergeParams: true,
+});
+
+roomCategoryRouter.use((req, res, next) => {
+  if (req.method === 'GET') { next(); return; }
+  authenticate(req, res, () => requireRole('HOTEL_MANAGER', 'ADMIN')(req, res, () => {
+    Promise.resolve(requireHotelOwner(req, res, next)).catch(next);
+  }));
 });
 
 roomCategoryRouter.post(

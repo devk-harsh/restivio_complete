@@ -1,3 +1,6 @@
+import { createHash } from 'crypto';
+import { Transaction } from 'sequelize';
+import InventoryReservation from '../db/models/inventoryReservation';
 import sequelize from "../db/models/sequelize";
 
 import { RoomRepository } from "../repositories/room.repository";
@@ -191,7 +194,15 @@ export async function reserveRoomsService(
   const nights = stayDates.length;
 
   return sequelize.transaction(
+    { isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED },
     async (transaction) => {
+      const fingerprint = createHash('sha256').update(JSON.stringify([reservationData.hotelId, reservationData.roomCategoryId, reservationData.checkIn, reservationData.checkOut, reservationData.numberOfRooms])).digest('hex');
+      // Serialize reserve/release for this booking without replacing inventory row locks.
+      await sequelize.query('INSERT IGNORE INTO inventory_reservations (bookingId, hotelId, fingerprint, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())', { replacements: [reservationData.bookingId, reservationData.hotelId, fingerprint, 'PENDING'], transaction });
+      const ledger = (await InventoryReservation.findByPk(reservationData.bookingId, { transaction, lock: transaction.LOCK.UPDATE }))!;
+      if (ledger.status === 'RELEASED') throw new ConflictError('This booking reservation has already been released');
+      if (ledger.hotelId !== reservationData.hotelId || ledger.fingerprint !== fingerprint) throw new ConflictError('This bookingId has a different reservation request');
+      if (ledger.status === 'RESERVED' && ledger.response) return { ...ledger.response, alreadyReserved: true };
       /*
         1. Idempotency:
         Has this booking already reserved inventory?
@@ -228,7 +239,7 @@ export async function reserveRoomsService(
             ),
           ];
 
-        return {
+        const result = {
           bookingId:
             reservationData.bookingId,
 
@@ -265,6 +276,8 @@ export async function reserveRoomsService(
 
           alreadyReserved: true,
         };
+        await ledger.update({ status: 'RESERVED', response: result }, { transaction });
+        return result;
       }
 
       /*
@@ -349,7 +362,7 @@ export async function reserveRoomsService(
         Callback returns successfully
         → Sequelize COMMITs transaction.
       */
-      return {
+      const result = {
         bookingId:
           reservationData.bookingId,
 
@@ -386,6 +399,8 @@ export async function reserveRoomsService(
 
         alreadyReserved: false,
       };
+      await ledger.update({ status: 'RESERVED', response: result }, { transaction });
+      return result;
     }
   );
 }
@@ -395,6 +410,10 @@ export async function releaseRoomsService(
 ) {
   return sequelize.transaction(
     async (transaction) => {
+      await sequelize.query('INSERT IGNORE INTO inventory_reservations (bookingId, hotelId, status, createdAt, updatedAt) VALUES (?, ?, ?, NOW(), NOW())', { replacements: [releaseData.bookingId, releaseData.hotelId, 'PENDING'], transaction });
+      const ledger = (await InventoryReservation.findByPk(releaseData.bookingId, { transaction, lock: transaction.LOCK.UPDATE }))!;
+      if (ledger.hotelId !== releaseData.hotelId) throw new ConflictError('Booking belongs to a different hotel');
+      await ledger.update({ status: 'RELEASED' }, { transaction });
       const releasedRows =
         await roomRepository
           .releaseInventoryByBookingId(

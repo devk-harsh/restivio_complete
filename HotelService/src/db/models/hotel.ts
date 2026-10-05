@@ -13,6 +13,7 @@ class Hotel extends Model<
 > {
   declare id: CreationOptional<number>;
   declare name: string;
+  declare managerUserId: CreationOptional<number | null>;
   declare address: string;
   declare location: string;
   declare rating: CreationOptional<number | null>;
@@ -35,6 +36,7 @@ Hotel.init( //actual mapping
       type: DataTypes.STRING(255),
       allowNull: false,
     },
+    managerUserId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, field: "manager_user_id" },
     address: {
       type: DataTypes.STRING(500),
       allowNull: false,

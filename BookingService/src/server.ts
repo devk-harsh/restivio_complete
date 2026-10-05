@@ -1,45 +1,29 @@
-import express from 'express';
+import app from './app';
 import { serverConfig } from './config';
-import './db/models/associations';
-import v1Router from './routers/V1/index.router';
-import v2Router from './routers/V2/index.router';
-import { appErrorHandler, genericErrorHandler } from './middlewares/error.middleware';
-import logger from './config/logger.config';
-import { attachCorrelationIdMiddleware } from './middlewares/correlation.middleware';
 import sequelize from './db/models/sequelize';
 import { redisClient } from './config/redis.config';
-
-
-const app = express();
-
-app.use(express.json());
-
-app.use(attachCorrelationIdMiddleware);
-app.use('/api/v1', v1Router);
-app.use('/api/v2', v2Router); 
-
-
-app.use(appErrorHandler);
-app.use(genericErrorHandler);
-
-
-const startServer = async () => {
-    try {
-        await sequelize.authenticate();
-        logger.info('Database connection has been established successfully.');
-
-        const pong = await redisClient.ping();
-        logger.info(`Redis connection successful: ${pong}`);
-
-        app.listen(serverConfig.PORT, () => {
-            logger.info(`Server is running on http://localhost:${serverConfig.PORT}`);
-            logger.info(`Press Ctrl+C to stop the server.`);
-        });
-
-    } catch (error) {
-        logger.error('Unable to connect to the database:', error);
-        process.exit(1);
-    }
-};
-
-startServer();
+import logger from './config/logger.config';
+import { jwtSecret } from './middlewares/auth.middleware';
+import { dispatchOutboxBatch } from './services/outbox.service';
+import { recoverPendingBookings } from './services/booking.service';
+async function start() {
+  jwtSecret();
+  if (!process.env.INTERNAL_SERVICE_KEY) throw new Error('INTERNAL_SERVICE_KEY is required');
+  await sequelize.authenticate(); await redisClient.ping();
+  let stopping = false;
+  let running = Promise.resolve();
+  const tick = () => {
+    running = (async () => {
+      try { await dispatchOutboxBatch(); await recoverPendingBookings(); }
+      catch (error) { logger.error('Background work will retry', { error: error instanceof Error ? error.message : 'Unknown error' }); }
+    })().finally(() => { if (!stopping) timer = setTimeout(tick, 1000); });
+  };
+  let timer = setTimeout(tick, 1000);
+  const server = app.listen(serverConfig.PORT, () => logger.info('BookingService listening', { port: serverConfig.PORT }));
+  const shutdown = () => {
+    stopping = true; clearTimeout(timer);
+    server.close(() => { void running.then(async () => { await redisClient.quit(); await sequelize.close(); process.exit(0); }); });
+  };
+  process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
+}
+start().catch(error => { logger.error('Startup failed', { error: error.message }); process.exit(1); });

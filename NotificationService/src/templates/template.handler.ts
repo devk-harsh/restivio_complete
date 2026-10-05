@@ -6,6 +6,7 @@ export async function renderMailTemplate(
   templateId: string,
   params: Record<string, unknown>
 ) {
+  if (!['booking-confirmed', 'booking-cancelled'].includes(templateId)) throw new Error('Unknown email template');
   const templatePath = path.join(
     process.cwd(),
     "src",

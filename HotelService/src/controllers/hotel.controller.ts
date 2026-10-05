@@ -6,7 +6,7 @@ import { StatusCodes } from "http-status-codes";
 export async function createHotelHandler(req: Request, res: Response, next: NextFunction) {
 
     // 1. Call service layer
-    const hotelResponse = await createHotelService(req.body);
+    const hotelResponse = await createHotelService({ ...req.body, managerUserId: res.locals.user.userId });
 
     // 2. Send response
     res.status(StatusCodes.CREATED).json({

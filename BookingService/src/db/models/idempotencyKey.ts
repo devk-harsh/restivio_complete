@@ -15,6 +15,11 @@ class IdempotencyKey extends Model<
   declare idemKey: string;
   declare finalized: CreationOptional<boolean>;
   declare bookingId: number;
+  declare userId: CreationOptional<number | null>;
+  declare requestHash: CreationOptional<string | null>;
+  declare status: CreationOptional<'PROCESSING' | 'COMPLETED' | 'COMPENSATING'>;
+  declare response: CreationOptional<Record<string, unknown> | null>;
+  declare responseStatus: CreationOptional<number | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -46,6 +51,11 @@ IdempotencyKey.init(
       type: DataTypes.DATE,
       allowNull: false
     },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+    requestHash: { type: DataTypes.STRING(64), allowNull: true },
+    status: { type: DataTypes.ENUM('PROCESSING', 'COMPLETED', 'COMPENSATING'), allowNull: false, defaultValue: 'PROCESSING' },
+    response: { type: DataTypes.JSON, allowNull: true },
+    responseStatus: { type: DataTypes.INTEGER, allowNull: true },
     updatedAt: {
       type: DataTypes.DATE,
       allowNull: false

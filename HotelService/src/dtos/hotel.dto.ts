@@ -1,4 +1,5 @@
 export type createHotelDTO = {
+  managerUserId: number;
   name: string;
   address: string;
   location: string;

@@ -1,16 +1,15 @@
-import { mailerQueue, EMAIL_JOB_NAME } from "../queues/mailer.queue";
-import { EmailJobPayload } from "../types/email.types";
-
-export async function addEmailToQueue(payload:EmailJobPayload) {
-    const job = await mailerQueue.add(EMAIL_JOB_NAME, payload, {
-        attempts: 3,
-        backoff: {
-            type: "fixed",
-            delay: 5000, // 5 seconds,
-            jitter: 0.5, // Add random jitter to helps avoid many failed jobs retrying at exactly the same moment.
-        },
-        removeOnComplete: true,
-        removeOnFail: false,
-    });
-    return job;
+import { mailerQueue, EMAIL_JOB_NAME } from '../queues/mailer.queue';
+import { EmailJobPayload } from '../types/email.types';
+import { emailJobs } from '../config/metrics';
+export async function addEmailToQueue(payload: EmailJobPayload) {
+  const job = await mailerQueue.add(EMAIL_JOB_NAME, payload, {
+    ...(payload.eventId ? { jobId: payload.eventId } : {}),
+    attempts: 3,
+    backoff: { type: 'exponential', delay: Number(process.env.EMAIL_RETRY_DELAY_MS) || 1000, jitter: 0.2 },
+    // Keep completed IDs: outbox retries must not enqueue a second logical job.
+    removeOnComplete: false,
+    removeOnFail: false,
+  });
+  emailJobs.inc({ outcome: 'accepted' });
+  return job;
 }

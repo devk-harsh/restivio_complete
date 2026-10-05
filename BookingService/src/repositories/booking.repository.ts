@@ -1,15 +1,8 @@
 import logger from "../config/logger.config";
 import Booking from "../db/models/booking";
-import { Transaction } from "sequelize";
+import { CreationAttributes, Transaction } from "sequelize";
 
-interface CreateBookingRepositoryDTO {
-  userId: number;
-  userEmail: string;
-  hotelId: number;
-  bookingAmount: number;
-  totalGuests: number;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
-}
+type CreateBookingRepositoryDTO = CreationAttributes<Booking>;
 
 export async function createBooking(
   bookingData: CreateBookingRepositoryDTO,

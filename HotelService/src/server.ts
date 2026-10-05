@@ -1,40 +1,14 @@
-import express from 'express';
+import app from './app';
 import { serverConfig } from './config';
-import v1Router from './routers/v1/index.router';
-import v2Router from './routers/v2/index.router';
-import { appErrorHandler, genericErrorHandler } from './middlewares/error.middleware';
-import logger from './config/logger.config';
-import { attachCorrelationIdMiddleware } from './middlewares/correlation.middleware';
 import sequelize from './db/models/sequelize';
-import "./db/models/associations";
-
-const app = express();
-
-app.use(express.json());
-
-app.use(attachCorrelationIdMiddleware);
-app.use('/api/v1', v1Router);
-app.use('/api/v2', v2Router); 
-
-
-app.use(appErrorHandler);
-app.use(genericErrorHandler);
-
-
-const startServer = async () => {
-    try {
-        await sequelize.authenticate();
-        logger.info('Database connection has been established successfully.');
-
-        app.listen(serverConfig.PORT, () => {
-            logger.info(`Server is running on http://localhost:${serverConfig.PORT}`);
-            logger.info(`Press Ctrl+C to stop the server.`);
-        });
-
-    } catch (error) {
-        logger.error('Unable to connect to the database:', error);
-        process.exit(1);
-    }
-};
-
-startServer();
+import logger from './config/logger.config';
+import { jwtSecret } from './middlewares/auth.middleware';
+async function start() {
+  jwtSecret();
+  if (!process.env.INTERNAL_SERVICE_KEY) throw new Error('INTERNAL_SERVICE_KEY is required');
+  await sequelize.authenticate();
+  const server = app.listen(serverConfig.PORT, () => logger.info('HotelService listening', { port: serverConfig.PORT }));
+  const shutdown = () => server.close(() => { void sequelize.close().then(() => process.exit(0)); });
+  process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
+}
+start().catch(error => { logger.error('Startup failed', { error: error.message }); process.exit(1); });
