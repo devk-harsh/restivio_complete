@@ -16,6 +16,16 @@ async function login(email, password = 'RestivioDemo123!') {
   return result.body.data.accessToken;
 }
 const bearer = token => ({ Authorization: 'Bearer ' + token });
+const fixtureHotels = new Set();
+function trackHotel(id) { fixtureHotels.add(id); }
+async function cleanupHotels() {
+  if (!fixtureHotels.size) return;
+  const admin = await login('admin@restivio.local');
+  for (const id of fixtureHotels) {
+    await api.hotel.delete('/api/v1/hotels/' + id).set(bearer(admin)).expect(200);
+  }
+  fixtureHotels.clear();
+}
 async function waitFor(fn, timeout = 30000) {
   const deadline = Date.now() + timeout;
   let last;
@@ -33,6 +43,7 @@ function stay() {
 async function fixture(manager, roomCount = 2) {
   const hotel = await api.hotel.post('/api/v1/hotels').set(bearer(manager)).send({ name: 'Integration ' + randomUUID(), address: 'Test Road', location: 'Goa' }).expect(201);
   const hotelId = hotel.body.data.id;
+  trackHotel(hotelId);
   const category = await api.hotel.post('/api/v1/hotels/' + hotelId + '/room-categories').set(bearer(manager)).send({ roomType: 'DOUBLE', price: 2500, roomCount }).expect(201);
   const roomCategoryId = category.body.data.id;
   const dates = stay();
@@ -40,4 +51,4 @@ async function fixture(manager, roomCount = 2) {
     .set(bearer(manager)).send({ startDate: dates.checkIn, endDate: dates.checkOut }).expect(201);
   return { hotelId, roomCategoryId, ...dates, numberOfRooms: 1, totalGuests: 2 };
 }
-module.exports = { api, bases, db, login, bearer, waitFor, stay, fixture, internal, randomUUID };
+module.exports = { api, bases, db, login, bearer, waitFor, stay, fixture, internal, randomUUID, trackHotel, cleanupHotels };

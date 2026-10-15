@@ -10,6 +10,8 @@ import sequelize from './db/models/sequelize';
 import './db/models/associations';
 
 const app = express();
+import { browserCors } from './middlewares/cors.middleware';
+app.use(browserCors);
 app.use(attachCorrelationIdMiddleware, httpMetrics, express.json({ limit: '64kb' }));
 operationalRoutes(app, { database: () => sequelize.authenticate(),  });
 mountDocs(app);

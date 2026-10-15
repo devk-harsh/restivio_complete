@@ -1,7 +1,7 @@
 const { execFileSync } = require('node:child_process');
 const { Queue } = require('bullmq');
 const mysql = require('mysql2/promise');
-const { api, db, login, bearer, fixture, waitFor, internal, randomUUID } = require('./helpers.cjs');
+const { api, db, login, bearer, fixture, waitFor, internal, randomUUID, cleanupHotels } = require('./helpers.cjs');
 const enabled = process.env.TEST_CHAOS === 'true';
 const chaos = enabled ? test : test.skip;
 let bookingDb, hotelDb, queue, dlq;
@@ -12,7 +12,7 @@ beforeAll(() => {
   dlq = new Queue('email-dlq', { connection });
 });
 const compose = (...args) => execFileSync('docker', ['compose', ...args], { cwd: require('node:path').resolve(__dirname, '../..'), stdio: 'pipe', timeout: 60000 });
-afterAll(async () => { if (queue) await Promise.all([bookingDb.end(), hotelDb.end(), queue.close(), dlq.close()]); });
+afterAll(async () => { try { await cleanupHotels(); } finally { if (queue) await Promise.all([bookingDb.end(), hotelDb.end(), queue.close(), dlq.close()]); } });
 
 test('Recovery compensates a durable pending booking left after an interrupted request', async () => {
   const manager = await login('manager@restivio.local');

@@ -18,11 +18,15 @@ jobs:
             HotelService/package-lock.json
             BookingService/package-lock.json
             NotificationService/package-lock.json
+            Frontend/package-lock.json
       - run: npm ci
       - run: npm run install:services
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+      - run: npm ci --prefix Frontend
+      - run: npm run build --prefix Frontend
+      - run: npm test --prefix Frontend
       - run: cp .env.example .env
       - run: docker compose up -d --build --wait --wait-timeout 240
       - run: npm run test:integration

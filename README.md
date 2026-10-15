@@ -1,14 +1,17 @@
 # Restivio
 
-An educational backend system demonstrating reliable hotel-booking workflows and common distributed-system patterns. Built incrementally on the original HotelService, BookingService and NotificationService; AuthService completes identity and access control. There is no frontend or payment integration.
+An educational hotel-booking application demonstrating reliable workflows and common distributed-system patterns. Built incrementally on the original HotelService, BookingService and NotificationService; AuthService completes identity and access control. A React + TypeScript frontend makes the existing APIs usable for guests, hotel managers and administrators. There is no payment integration.
+
+The root-level [Frontend/](Frontend/README.md) uses Vite, React Router, Axios, Context and plain CSS. See its README for frontend development, session handling, role-aware pages and the booking demo.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  Client --> Auth[AuthService :3000]
-  Client --> Hotel[HotelService :3001]
-  Client --> Booking[BookingService :3002]
+  Client[Client browser] --> Frontend[React Frontend :5173]
+  Frontend --> Auth[AuthService :3000]
+  Frontend --> Hotel[HotelService :3001]
+  Frontend --> Booking[BookingService :3002]
   Auth --> AuthDB[(MySQL auth)]
   Hotel --> HotelDB[(MySQL hotel)]
   Booking --> BookingDB[(MySQL booking + outbox)]
@@ -61,6 +64,7 @@ available Redis quorum.
 
 | Component | Local URL |
 | --- | --- |
+| React frontend | http://localhost:5173 |
 | AuthService / Swagger | http://localhost:3000/docs |
 | HotelService / Swagger | http://localhost:3001/docs |
 | BookingService / Swagger | http://localhost:3002/docs |

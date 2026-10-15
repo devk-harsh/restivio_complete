@@ -1,6 +1,6 @@
 const request = require('supertest');
 const { Queue } = require('bullmq');
-const { api, bases, db, login, bearer, waitFor, fixture, internal, randomUUID } = require('./helpers.cjs');
+const { api, bases, db, login, bearer, waitFor, fixture, internal, randomUUID, trackHotel, cleanupHotels } = require('./helpers.cjs');
 const authDb = db('auth'), hotelDb = db('hotel'), bookingDb = db('booking');
 let manager, admin, user, other, userId;
 const email = 'acceptance-' + randomUUID() + '@example.com';
@@ -13,7 +13,7 @@ beforeAll(async () => {
   user = await login(email, 'AcceptancePass123!');
   other = await login('user@restivio.local');
 });
-afterAll(async () => { await Promise.all([authDb.end(), hotelDb.end(), bookingDb.end(), queue.close()]); });
+afterAll(async () => { try { await cleanupHotels(); } finally { await Promise.all([authDb.end(), hotelDb.end(), bookingDb.end(), queue.close()]); } });
 
 test('A: registration, login, JWT, refresh rotation, logout, invalid token', async () => {
   await api.auth.post('/api/v1/auth/register').send({ name: 'Escalation', email: 'forbidden-' + randomUUID() + '@example.com', password: 'AcceptancePass123!', role: 'ADMIN' }).expect(400);
@@ -50,6 +50,7 @@ test('B/C: RBAC, ownership, categories, generation, public availability, correla
   const [hotels] = await hotelDb.query('SELECT manager_user_id FROM hotels WHERE id=?', [intent.hotelId]);
   expect(hotels[0].manager_user_id).toBe(2);
   const foreign = await api.hotel.post('/api/v1/hotels').set(bearer(admin)).send({ name: 'Admin ' + randomUUID(), address: 'a', location: 'b' }).expect(201);
+  trackHotel(foreign.body.data.id);
   const managerEmail = 'other-manager-' + randomUUID() + '@example.com';
   const registeredManager = await api.auth.post('/api/v1/auth/register').send({ name: 'Other manager', email: managerEmail, password: 'AcceptancePass123!' }).expect(201);
   // Test fixture promotion represents the seed/admin provision process, not a public API.

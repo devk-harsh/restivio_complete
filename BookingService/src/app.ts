@@ -10,6 +10,8 @@ import sequelize from './db/models/sequelize';
 import './db/models/associations';
 import { redisClient } from './config/redis.config';
 const app = express();
+import { browserCors } from './middlewares/cors.middleware';
+app.use(browserCors);
 app.use(attachCorrelationIdMiddleware, httpMetrics, express.json({ limit: '64kb' }));
 operationalRoutes(app, { database: () => sequelize.authenticate(), redis: () => redisClient.ping() });
 mountDocs(app);

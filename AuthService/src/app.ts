@@ -10,6 +10,8 @@ import logger from './config/logger.config';
 import { mountDocs } from './config/docs';
 
 const app = express();
+import { browserCors } from './middlewares/cors.middleware';
+app.use(browserCors);
 app.use(attachCorrelationIdMiddleware, httpMetrics, express.json({ limit: '32kb' }), cookieParser());
 operationalRoutes(app, { database: () => sequelize.authenticate() });
 mountDocs(app);

@@ -18,7 +18,8 @@ function sendSession(res: Response, result: Awaited<ReturnType<typeof auth.login
 // Cookies are same-site; reject explicit cross-origin browser writes as an additional CSRF guard.
 const sameOrigin: RequestHandler = (req, res, next) => {
   const origin = req.get('origin');
-  if (origin && origin !== (process.env.AUTH_ORIGIN || 'http://localhost:3000')) {
+  const allowedOrigins = [process.env.AUTH_ORIGIN || 'http://localhost:3000', process.env.FRONTEND_ORIGIN || 'http://localhost:5173'];
+  if (origin && !allowedOrigins.includes(origin)) {
     res.status(403).json({ success: false, message: 'Origin is not allowed' }); return;
   }
   next();
